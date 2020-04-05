@@ -1,5 +1,5 @@
-//try {
-    //(() => {
+try {
+    ($ => {
         function KLerp(a, b, t) {
             return a + (b - a) * t;
         }
@@ -27,6 +27,9 @@
 
         var currentGame = null;
         var acClass = window.AudioContext || window.webkitAudioContext;
+
+        // Export our game object for further use.
+        $.currentGame = currentGame;
 
         /** @type {AudioContext} */
         var audioContext = new acClass();
@@ -1152,195 +1155,10 @@
 
         canvas.addEventListener("touchstart", handler);
         canvas.addEventListener("click", handler);
-//    })()
-//} catch(ex) {
-//    alert(ex);
-//}
 
-new Game(canvas);
-
-function hasQuery(key) {
-    return location.search.indexOf("?"+key) != -1 || location.search.indexOf("&"+key) != -1;
+        // Launch our game.
+        new Game(canvas);
+    })(window);
+} catch(ex) {
+    // We will think of a new way to warn about initialization errors.
 }
-
-if(hasQuery("dev")) {
-    setupDebugger(document.getElementById("enable-debugger"));
-}
-
-function setupDebugger(btn) {
-    var s = document.createElement("script");
-    s.src = "debugger.js";
-    document.body.append(s);
-
-    if(btn) {
-        btn.disabled = true;
-    }
-}
-
-if(hasQuery("bandori")) {
-    currentGame.bandoriMode = true;
-}
-var btn = document.getElementById("switch-bandori");
-btn.classList.remove("btn-success", "btn-danger");
-btn.classList.add("btn-" + (currentGame.bandoriMode ? "danger" : "success"));
-
-function switchSpeed(btn) {
-    var speedText = btn.innerText;
-    var speed = parseFloat(speedText.substring(0, speedText.length - 1));
-    document.getElementById("game-audio").playbackRate = speed;
-}
-
-function switchBandori() {
-    currentGame.bandoriMode = !currentGame.bandoriMode;
-    var btn = document.getElementById("switch-bandori");
-    btn.classList.remove("btn-success", "btn-danger");
-    btn.classList.add("btn-" + (currentGame.bandoriMode ? "danger" : "success"));
-}
-
-function refreshSwitch() {
-}
-
-function fullScreen() {
-    document.getElementById("main").requestFullscreen();
-    setTimeout(() => {
-        currentGame.audioElem.play();
-    }, 5000);
-}
-
-function loadByButton(btn, diff) {
-    currentGame.loadBestdoriMap(btn.parentNode.previousElementSibling.previousElementSibling.innerText, diff);
-    document.body.scroll({
-        top: 0
-    });
-}
-
-function loadCByButton(btn) {
-    currentGame.loadBestdoriComMap(btn.parentNode.previousElementSibling.previousElementSibling.innerText);
-    document.body.scroll({
-        top: 0
-    });
-}
-
-function loadTables() {
-    var officialsTable = document.getElementById("official-map-table");
-    var communitiesTable = document.getElementById("community-map-table");
-
-    var t = `<tr>
-    <th scope="col">#</th><th scope="col">歌名</th><th scope="col"> </th>
-</tr>`;
-    officialsTable.innerHTML = t;
-    communitiesTable.innerHTML = t;
-
-    fetch("./assets/song_database.json", {
-        cache: "no-cache"
-    }).then(r => r.json())
-    .then(db => {
-        function create(name) {
-            return document.createElement(name);
-        }
-
-        function createBadge(name, color) {
-            var badge = create("span");
-            badge.classList.add("badge", "align-middle", "mr-1");
-            badge.style.background = color || "#90a4ae";
-            badge.style.color = "#fff";
-            badge.innerText = name;
-            return badge;
-        }
-
-        var diffColor = {
-            easy: "#3d5afe",
-            normal: "#43a047",
-            hard: "#ffa000",
-            expert: "#d50000",
-            special: "#d500f9"
-        };
-
-        db.officials.sort((a, b) => a.id - b.id).forEach(item => {
-            var row = create("tr");
-            var idCell = create("th");
-            idCell.scope = "row";
-            idCell.innerText = item.id;
-            idCell.classList.add("align-middle");
-
-            var titleCell = create("td");
-            var titleContainer = create("div");
-            titleCell.classList.add("align-middle");
-            titleContainer.innerHTML = `<div class="spinner-grow" role="status"><span class="sr-only">載入中...</span></div>`;
-            titleContainer.style.display = "inline-block";
-            titleContainer.classList.add("mr-4", "align-middle");
-            titleCell.appendChild(titleContainer);
-
-            item.storedDiffs.forEach(d => {
-                titleCell.appendChild(createBadge(d.toUpperCase(), diffColor[d]));
-            });
-
-            var loadCell = create("td");
-            loadCell.classList.add("align-middle");
-            loadCell.innerHTML = `<button class="btn btn-link" onclick="loadByButton(this, bdr_diff.value)")">載入</button>`;
-
-            row.appendChild(idCell);
-            row.appendChild(titleCell);
-            row.appendChild(loadCell);
-
-            fetch(`./assets/charts/bandori/${item.id}.${item.storedDiffs[0]}.json`, {
-                cache: "no-cache"
-            }).then(r => r.json())
-            .then(json => {
-                var html = `<span>${json.song.title}</span><br/><small style="opacity: 0.7">${json.song.romanizedTitle}</small>`;
-                function ra(s, a, b) {
-                    var r = s;
-                    while(r != r.replace(a, b)) {
-                        r = r.replace(a, b);
-                    }
-                    return r;
-                }
-                html = ra(html, "[FULL]", `<div style="background-color: transparent; background-image: url('./assets/full.png'); background-size: cover; background-blend-mode: multiply; display: inline-block; vertical-align: middle; width: 1.6em; height: 0.8em; margin-top: -0.2em;"></div>`);
-                titleContainer.innerHTML = html;
-            });
-
-            officialsTable.appendChild(row);
-        });
-
-        db.communities.forEach(item => {
-            var row = create("tr");
-            var idCell = create("th");
-            idCell.scope = "row";
-            idCell.innerText = item.id;
-
-            var titleCell = create("td");
-            var titleContainer = create("div");
-            titleCell.classList.add("align-middle");
-            titleContainer.innerHTML = `<div class="spinner-grow" role="status"><span class="sr-only">載入中...</span></div>`;
-            titleContainer.style.display = "inline-block";
-            titleContainer.classList.add("mr-4", "align-middle");
-            titleCell.appendChild(titleContainer);
-
-            var loadCell = create("td");
-            loadCell.innerHTML = `<button class="btn btn-link" onclick="loadCByButton(this)")">載入</button>`;
-
-            row.appendChild(idCell);
-            row.appendChild(titleCell);
-            row.appendChild(loadCell);
-
-            fetch(`./assets/charts/community/${item.id}.json`, {
-                cache: "no-cache"
-            }).then(r => r.json())
-            .then(json => {
-                var html = `<span>${json.song.title}</span><br/><small style="opacity: 0.7">${json.song.romanizedTitle}</small>`;
-                function ra(s, a, b) {
-                    var r = s;
-                    while(r != r.replace(a, b)) {
-                        r = r.replace(a, b);
-                    }
-                    return r;
-                }
-                html = ra(html, "[FULL]", `<div style="background-color: transparent; background-image: url('./assets/full.png'); background-size: cover; background-blend-mode: multiply; display: inline-block; vertical-align: middle; width: 1.6em; height: 0.8em; margin-top: -0.2em;"></div>`);
-                titleContainer.innerHTML = html;
-            });
-
-            communitiesTable.appendChild(row);
-        });
-    });
-}
-loadTables();
