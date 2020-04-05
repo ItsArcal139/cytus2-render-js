@@ -1,0 +1,60 @@
+{
+    "officials": [
+        {
+            "id": 4,
+            "storedDiffs": [ "expert", "special" ]
+        },
+        {
+            "id": 31,
+            "storedDiffs": [ "expert" ]
+        },
+        {
+            "id": 55, "hasSpecial": true,
+            "storedDiffs": [ "expert" ]
+        },
+        {
+            "id": 77,
+            "storedDiffs": [ "expert" ]
+        },
+        {
+            "id": 81,
+            "storedDiffs": [ "expert" ]
+        },
+        {
+            "id": 85, "hasSpecial": true,
+            "storedDiffs": [ "expert", "special" ]
+        },
+        {
+            "id": 87,
+            "storedDiffs": [ "expert" ]
+        },
+        {
+            "id": 89, "hasSpecial": true,
+            "storedDiffs": [ "expert", "special" ]
+        },
+        {
+            "id": 128, "hasSpecial": true,
+            "storedDiffs": [ "hard", "expert", "special" ]
+        },
+        {
+            "id": 140,
+            "storedDiffs": [ "expert" ]
+        },
+        {
+            "id": 201,
+            "storedDiffs": [ "expert" ]
+        },
+        {
+            "id": 243,
+            "storedDiffs": [ "expert" ]
+        },
+        {
+            "id": 1002,
+            "storedDiffs": [ "expert" ]
+        }
+    ],
+    "communities": [
+        { "id": 3924 },
+        { "id": 13558 }
+    ]
+}

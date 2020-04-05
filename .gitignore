@@ -1,0 +1,7 @@
+index.php
+
+# You can setup these on your own.
+assets/song_database.json
+assets/bandori/*
+assets/charts/*
+assets/audio/*
