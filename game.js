@@ -25,11 +25,7 @@ try {
             return KV2Add(a, KV2Mult(KV2Add(b, KV2Mult(a, -1)), t));
         }
 
-        var currentGame = null;
         var acClass = window.AudioContext || window.webkitAudioContext;
-
-        // Export our game object for further use.
-        $.currentGame = currentGame;
 
         /** @type {AudioContext} */
         var audioContext = new acClass();
@@ -71,7 +67,8 @@ try {
                     throw new Error("Canvas is not supported.");
                 }
 
-                currentGame = this;
+                // Export our game for further use.
+                Game.currentGame = this;
 
                 // Fetch the hitsound!
                 fetch("./assets/soft-hitsoft.wav")
@@ -536,7 +533,7 @@ try {
 
             update() {
                 requestAnimationFrame(() => {
-                    if(currentGame == this)
+                    if(Game.currentGame == this)
                     this.update();
                 });
         
@@ -627,7 +624,7 @@ try {
                     this.soundPlayed = false;
                 }
 
-                if(currentGame.enableClickSound && this.cleared && !this.soundPlayed) {
+                if(Game.currentGame.enableClickSound && this.cleared && !this.soundPlayed) {
                     this.soundPlayed = true;
                     
                     if(hitsoundBuffer != null) {
@@ -646,7 +643,7 @@ try {
 
         class CircleNote extends Note {
             render(ctx, time) {
-                var game = currentGame;
+                var game = Game.currentGame;
                 var fadeInTime = game.getModeFadeIn();
                 var fadeOutTime = game.noteFadeOutTime;
 
@@ -702,7 +699,7 @@ try {
 
         class FlickNote extends Note {
             render(ctx, time) {
-                var game = currentGame;
+                var game = Game.currentGame;
                 var fadeInTime = game.getModeFadeIn();
                 var fadeOutTime = game.noteFadeOutTime;
 
@@ -847,7 +844,7 @@ try {
             }
 
             render(ctx, time) {
-                var game = currentGame;
+                var game = Game.currentGame;
                 var fadeInTime = game.getModeFadeIn();
                 var fadeOutTime = game.noteFadeOutTime;
 
@@ -992,7 +989,7 @@ try {
             }
 
             drawHoldNote(ctx, time, startY, endY, color) {
-                var game = currentGame;
+                var game = Game.currentGame;
                 var fadeInTime = game.getModeFadeIn();
                 var fadeOutTime = game.noteFadeOutTime;
 
@@ -1119,7 +1116,7 @@ try {
             }
 
             render(ctx, time) {
-                var game = currentGame;
+                var game = Game.currentGame;
                 var direction = game.getDirection(this.time);
                 var y = game.getYByTime(this.time);
                 var endY = game.getYByTime(this.endTime);
@@ -1129,7 +1126,7 @@ try {
 
         class LongHoldNote extends HoldNote {
             render(ctx, time) {
-                var game = currentGame;
+                var game = Game.currentGame;
                 var direction = game.getDirection(this.time);
 
                 var sy = direction > 0 ? 0 : canvas.height;
@@ -1144,20 +1141,8 @@ try {
             }
         }
 
-        var canvas = document.getElementById("main");
-
-        var handler = e => {
-            e.preventDefault();
-            if(audioContext.state == "suspended") {
-                audioContext.resume();
-            }
-        };
-
-        canvas.addEventListener("touchstart", handler);
-        canvas.addEventListener("click", handler);
-
-        // Launch our game.
-        new Game(canvas);
+        // Export our Game class.
+        $.Game = Game;
     })(window);
 } catch(ex) {
     // We will think of a new way to warn about initialization errors.
