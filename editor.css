@@ -1,0 +1,16 @@
+body {
+    font-family: "Exo", "Noto Sans CJK", sans-serif;
+}
+
+.canvas-scroller {
+    position: fixed;
+    right: 125px;
+    height: calc(100% - 50px);
+    max-height: calc(100% - 50px);
+    overflow-y: scroll;
+}
+
+.canvas-scroller canvas {
+    position: fixed;
+    right: 150px;
+}

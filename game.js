@@ -29,6 +29,8 @@ try {
 
         /** @type {AudioContext} */
         var audioContext = new acClass();
+        audioContext.suspend();
+        $.audioContext = audioContext;
 
         var hitsoundBuffer = null;
 
@@ -50,25 +52,36 @@ try {
             return Math.round(millis / 1000 * 120);
         }
 
+        var perferredFont = `Exo, "Noto Sans CJK", sans-serif`;
+
         class Game {
-            constructor(canvas) {
+            constructor(canvas, { audioCompatMode, keepInstance }) {
                 if(!canvas || !canvas.getContext) {
                     throw new Error("Invalid canvas parameter.");
                 }
+        
+                this.canvas = canvas;
+                this.ratio = window.devicePixelRatio;
+                canvas.width *= window.devicePixelRatio;
+                canvas.height *= window.devicePixelRatio;
 
                 this.bandoriMode = false;
                 this.bandoriSpeed = 3.5;
                 this.bandoriLineY = canvas.height * 0.85;
-        
-                this.canvas = canvas;
+
                 this.context = canvas.getContext("2d");
+
+                this.timingPoints = [];
+                this.notes = [];
         
                 if(!this.context) {
                     throw new Error("Canvas is not supported.");
                 }
 
-                // Export our game for further use.
-                Game.currentGame = this;
+                if(!keepInstance) {
+                    // Export our game for further use.
+                    Game.currentGame = this;
+                }
 
                 // Fetch the hitsound!
                 fetch("./assets/soft-hitsoft.wav")
@@ -100,6 +113,25 @@ try {
                 /** @type {HTMLAudioElement} */
                 this.audioElem = document.getElementById("game-audio");
                 this.enableClickSound = true;
+                
+                // Setup the element as media source so we can
+                // render visualizer at the top.
+                this.audioAnalyser = audioContext.createAnalyser();
+
+                var createMatch = s => regex => regex.test(s);
+                
+                this.supportAudioContextBG = false;
+                var m = createMatch(navigator.userAgent);
+                this.isSafari = m(/iPhone/i) || m(/iPad/i) || m(/iPod/i) || (m(/Macintosh/i) && m(/Safari/i) && !m(/Chrome/i));
+                if(!audioCompatMode && !this.isSafari) {
+                    var src = audioContext.createMediaElementSource(this.audioElem);
+                    src.connect(this.audioAnalyser);
+                    this.supportAudioContextBG = true;
+                }
+                var gn = audioContext.createGain();
+                gn.gain.value = 1;
+                this.audioAnalyser.connect(gn);
+                gn.connect(audioContext.destination);
 
                 this.cachedBeatsInfo = null;
 
@@ -114,9 +146,18 @@ try {
                         this.update();
                     }); /**/
 
-                this.loadBestdoriMap(243, "expert").then(() => {
+                this.loadBestdoriMap(128, "expert").then(() => {
                     this.update();
                 }); /**/
+            }
+
+            getSongDifficulty() {
+                return {
+                    name: "unknown",
+                    level: 7,
+                    color: "#888",
+                    ...this.songMeta.difficulty || {}
+                };
             }
 
             exportMap() {
@@ -169,14 +210,22 @@ try {
 
             snapNotes() {
                 var snapLevel = 8;
-                var beats = this.getBeats()
-
                 var snap = n => {
                     if(n.nosnap) return;
 
                     var time = n.time;
-                    var beatLen = this.getBeatLengthAt(time);
-                    var beat = this.getBeatAtTime(time);
+                    var beatLen = time > 0 ? this.getBeatLengthAt(time) : KBpmToMillis(this.getBeatByIndex(Math.floor(-time)).bpm);
+                    var beat = time > 0 ? this.getBeatAtTime(time) : this.getBeatByIndex(Math.floor(-time));
+
+                    if(time < 0) {
+                        time = beat.time + beatLen * (-time % 1);
+                    }
+
+                    if(n instanceof HoldNote && n.endTime < 0) {
+                        var nbeatLen = KBpmToMillis(this.getBeatByIndex(Math.floor(-n.endTime)).bpm);
+                        var nbeat = this.getBeatByIndex(Math.floor(-n.endTime));
+                        n.endTime = nbeat.time + nbeatLen * (-n.endTime % 1);
+                    }
 
                     time -= beat.time;
                     time /= beatLen;
@@ -199,6 +248,7 @@ try {
                         n.nodes.forEach(n2 => {
                             snap(n2);
                         });
+                        n.nodes = n.nodes.sort((a, b) => b.time - a.time);
                     }
                 });
             }
@@ -304,6 +354,24 @@ try {
                 return beat;
             }
 
+            getBeatByIndex(index) {
+                var beats = this.getBeats();
+                var beatIndex = index;
+                var beat = null;
+                if(beatIndex >= beats.length) {
+                    var last = beats[beats.length-1];
+                    var beatLen = this.getBeatLengthAt(last.time);
+
+                    beat = {
+                        time: last.time + (beatIndex - beats.length + 1) * beatLen,
+                        bpm: last.bpm
+                    };
+                } else {
+                    beat = beats[beatIndex];
+                }
+                return beat;
+            }
+
             getBeatIndex(time) {
                 var index = 0;
                 var beats = this.getBeats();
@@ -365,19 +433,28 @@ try {
                     }
                 })
                 /** @type {Note[]} */
-                this.notes = notes.sort((a, b) => b.time - a.time);
+                this.notes = notes;
                 this.snapNotes();
+                this.notes = notes.map(n => {
+                    if(n instanceof HoldNote) {
+                        if(this.getBeatAtTime(n.endTime - 10).time > n.time + 10) {
+                            return new LongHoldNote(n);
+                        }
+                    }
+                    return n;
+                }).sort((a, b) => b.time - a.time);
                 this.prevBeatLen = this.getBeatLengthAt(1);
             }
 
-            parseBestdoriMap(json, { offset, cover, audio }) {
+            parseBestdoriMap(json, { offset, cover, audio, ...params}) {
                 var map = {
                     song: {
-                        title: "Bestdori",
-                        romanizedTitle: "Bestdori",
+                        title: "Not imported map",
+                        romanizedTitle: "Download from Bestdori!",
                         cover: cover || "./assets/cover.jpeg",
                         audio: audio,
-                        offset: offset === undefined ? 40 : offset
+                        offset: offset === undefined ? 40 : offset,
+                        ...params
                     },
                     timingPoints: [],
                     notes: []
@@ -438,6 +515,18 @@ try {
                 });
 
                 pendSliders = pendSliders.map(s => {
+                    // Remove circles overlapping the slider start.
+                    var removalNotes = [];
+                    map.notes.forEach((sn, i) => {
+                        if(sn.type == "circle" && Math.abs(sn.x - s.x) < 0.01 && Math.abs(sn.time - s.time) < 0.1) {
+                            removalNotes.push(i);
+                        }
+                    });
+
+                    removalNotes.sort((a, b) => b - a).forEach(n => {
+                        map.notes.splice(n, 1);
+                    });
+
                     if(s.nodes.length == 1 && Math.abs(s.nodes[0].x - s.x) < 0.01) {
                         var length = s.nodes[0].time - s.time;
                         return {
@@ -478,6 +567,14 @@ try {
                         this.audioElem.addEventListener("canplay", onLoad);
                     }
 
+                    var diffColor = {
+                        easy: "#3d5afe",
+                        normal: "#43a047",
+                        hard: "#ffa000",
+                        expert: "#d50000",
+                        special: "#d500f9"
+                    };
+
                     fetch(`./assets/charts/bandori/${id}.${level}.json`, {
                         cache: "no-cache"
                     })
@@ -491,7 +588,12 @@ try {
                         fetch(url).then(response => response.json())
                         .then(json => {
                             this.parseBestdoriMap(json, {
-                                offset: 40
+                                offset: -20,
+                                difficulty: {
+                                    name: level,
+                                    level: 15,
+                                    color: diffColor[level]
+                                }
                             });
                         })
                         .then(map => {
@@ -546,7 +648,7 @@ try {
                 // Cover image
                 if(this.coverImage.complete && this.coverImage.width > 0 && this.coverImage.height > 0) {
                     ctx.globalAlpha = 0.2;
-                    ctx.drawImage(this.coverImage, canvas.width / 2 - 250, canvas.height / 2 - 250, 500, 500)
+                    ctx.drawImage(this.coverImage, canvas.width / 2 - 250 * this.ratio, canvas.height / 2 - 250 * this.ratio, 500 * this.ratio, 500 * this.ratio)
                     ctx.globalAlpha = 1;
                 }
                 
@@ -554,7 +656,64 @@ try {
                 var time = (this.audioElem.currentTime + latency) * 1000 + this.globalOffset;
                 var y = this.getYByTime(time);
 
-                this.notes.forEach(n => n.render(ctx, time));
+                var maxCombo = 0;
+                var clearedCombo = 0;
+                var lastClearTime = -1000;
+
+                // Update each note object.
+                this.notes.forEach(n => {
+                    // Render.
+                    n.render(ctx, time);
+
+                    // Calculate combo amount.
+                    maxCombo++;
+                    if(time > n.time) {
+                        clearedCombo++;
+                        lastClearTime = Math.max(lastClearTime, n.time);
+                    }
+                    
+                    if(n instanceof FlickNote) {
+                        this.notes.forEach(sn => {
+                            if(sn instanceof SliderNote) {
+                                var nn = sn.nodes[0];
+                                if(Math.abs(nn.x - n.x) < 0.01 && Math.abs(nn.time - n.time) < 0.1 && this.bandoriMode) {
+                                    maxCombo--;
+                                    if(time > n.time) {
+                                        clearedCombo--;
+                                    }
+                                }
+                                return;
+                            }
+
+                            if(sn instanceof HoldNote) {
+                                if(Math.abs(sn.x - n.x) < 0.01 && Math.abs(sn.endTime - n.time) < 0.1 && this.bandoriMode) {
+                                    maxCombo--;
+                                    if(time > n.time) {
+                                        clearedCombo--;
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    if(n instanceof SliderNote) {
+                        n.nodes.forEach(nn => {
+                            maxCombo++;
+                            if(time > nn.time) {
+                                clearedCombo++;
+                                lastClearTime = Math.max(lastClearTime, nn.time);
+                            }
+                        });
+                    }
+
+                    if(n instanceof HoldNote && this.bandoriMode) {
+                        maxCombo++;
+                        if(time > n.endTime) {
+                            clearedCombo++;
+                            lastClearTime = Math.max(lastClearTime, n.endTime);
+                        }
+                    }
+                });
 
                 // Scanline
                 if(this.resetScanlineAt <= time) {
@@ -564,16 +723,29 @@ try {
                 // Scanline transform
                 var currBeatLen = this.getBeatLengthAt(time);
                 var nextBeatLen = this.getBeatLengthAt(time + currBeatLen);
-                if(nextBeatLen < currBeatLen) {
-                    var progress = this.getTimeInBeat(time) / currBeatLen;
-                    var color = KLerp(510, 0, progress * 1.5);
-                    this.scanlineColor = `rgb(255, ${color}, ${color})`;
-                } else if(nextBeatLen > currBeatLen) {
-                    var progress = this.getTimeInBeat(time) / currBeatLen;
-                    var color = KLerp(255 + 128, 255 - 128, progress);
-                    this.scanlineColor = `rgb(${color}, 255, 255)`;
-                }
 
+                // Draw scanline.
+                ctx.fillStyle = this.scanlineColor;
+                ctx.shadowColor = this.scanlineColor;
+                ctx.shadowBlur = 60;
+                ctx.fillRect(0, y, canvas.width, 5 * this.ratio);
+
+                if(nextBeatLen != currBeatLen) {
+                    var color = this.scanlineColor;
+                    if(nextBeatLen < currBeatLen) {
+                        ctx.globalAlpha = this.getTimeInBeat(time) / currBeatLen;
+                        color = "#f00";
+                    } else if(nextBeatLen > currBeatLen) {
+                        ctx.globalAlpha = this.getTimeInBeat(time) / currBeatLen;
+                        color = "#8ff";
+                    }
+                    ctx.shadowBlur = 60;
+                    ctx.fillStyle = color;
+                    ctx.fillRect(0, y, canvas.width, 5 * this.ratio);
+                    ctx.shadowBlur = 0;
+                    ctx.globalAlpha = 1;
+                }
+                
                 // Scanline temp color change
                 if(this.prevBeatLen != currBeatLen) {
                     this.resetScanlineAt = time + currBeatLen * 4;
@@ -584,58 +756,377 @@ try {
                     }
                 }
                 this.prevBeatLen = currBeatLen;
+                ctx.shadowColor = "transparent";
 
-                ctx.fillStyle = this.scanlineColor;
-                ctx.shadowColor = this.scanlineColor;
-                ctx.shadowBlur = 60;
-                ctx.fillRect(0, y, canvas.width, 5);
-                ctx.shadowBlur = 0;
-                ctx.font = "25px Arial";
-                // ctx.fillText("length = " + this.getBeatLengthAt(time), 5, canvas.height - 5);
+                // ======== UI ==========
+                var pt = this.supportAudioContextBG ? audioContext.state == "suspended" : this.audioElem.paused ? performance.now() : time;
+                pt += 200;
+                var bl = this.getBeatLengthAt(time + 200);
+                var bp = ((pt - this.getBeatAtTime(time + 200).time) / bl * 2) % 1;
 
-                // Mute indicator
+                if(this.bandoriMode) {
+                    var grd = ctx.createLinearGradient(0, 0, 0, canvas.height / 4);
+                    grd.addColorStop(0, "black");
+                    grd.addColorStop(1, "rgba(0, 0, 0, 0)");
+                    ctx.fillStyle = grd;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+
                 if(audioContext.state == "suspended") {
-                    ctx.drawImage(muteIcon, 50, 50, 75, 75);
-                    ctx.textBaseline = "middle";
-                    ctx.font = "45px sans-serif";
+                    ctx.beginPath();
                     ctx.fillStyle = "white";
-                    ctx.fillText("點一下關閉靜音", 150, 50 + 75 / 2);
+                    ctx.globalAlpha *= 0.2;
+                    ctx.arc(45.5 * this.ratio, 45.5 * this.ratio, KLerp(35 * this.ratio, 45 * this.ratio, Math.pow(Math.abs(Math.cos(bp * Math.PI)), 3)), 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.globalAlpha /= 0.2;
+                    ctx.beginPath();
+
+                    ctx.drawImage(muteIcon, 25 * this.ratio, 25 * this.ratio, 37.5 * this.ratio, 37.5 * this.ratio);
+                    ctx.textBaseline = "middle";
+                    ctx.font = (22.5 * this.ratio) + "px " + perferredFont;
+                    ctx.fillStyle = "white";
+                    ctx.fillText("Tap to " + (this.supportAudioContextBG ? "start" : "unmute tap sounds"), 75 * this.ratio, (28 + 75 / 4) * this.ratio);
                     ctx.textBaseline = "alphabetic";
                 }
+
+                var score = (n => {
+                    if(n == 0) return "000000";
+                    var d = Math.log10(n + 1);
+                    var r = "";
+                    for(var i=0; i < 5 - d; i++) {
+                        r += "0";
+                    }
+                    return r + n;
+                })(Math.round(
+                    1000000 * clearedCombo / maxCombo
+                ));
+
+                ctx.textBaseline = "alphabetic";
+                ctx.font = (35 * this.ratio) + "px " + perferredFont;
+                ctx.fillStyle = "white";
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.textAlign = "center";
+                var sc = (1 - Math.min(Math.max((time - lastClearTime) / 150, 0), 1)) / 5 + 1;
+
+                score.split("").reverse().forEach((c, i) => {
+                    var d = Math.log10(parseInt(score) + 1);
+                    var s = 6 - d < (6 - i) ? sc : 0.75;
+                    var x = canvas.width - (45 + i * 25) * this.ratio;
+                    var y = 55 * this.ratio;
+                    ctx.translate(x, y);
+                    ctx.scale(s, s);
+                    ctx.fillText(c, 0, 0);
+                    ctx.scale(1 / s, 1 / s);
+                    ctx.translate(-x, -y);
+                });
+
+                // Combo text
+                ctx.textBaseline = "middle";
+                this.canvas.style.letterSpacing = (5 * this.ratio) + "px";
+                ctx.textAlign = "center";
+                ctx.font = "500 " + (50 * this.ratio) +"px " + perferredFont;
+                ctx.fillStyle = "#fff59d";
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.translate(canvas.width / 2, 45 * this.ratio);
+                ctx.scale(sc, sc);
+                ctx.fillText(clearedCombo, 0 + 5 * this.ratio, 0);
+                ctx.scale(1 / sc, 1 / sc);
+                ctx.translate(-canvas.width / 2, -45 * this.ratio);
+                this.canvas.style.letterSpacing = "0px";
+                
+                ctx.textBaseline = "top";
+                ctx.fillStyle = "#888";
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.font = "bold " + (25 * this.ratio) + "px " + perferredFont;
+                ctx.fillText("COMBO".split("").join(" "), canvas.width / 2 + 5 * this.ratio, 70 * this.ratio);
+
+                ctx.textBaseline = "alphabetic";
+                ctx.textAlign = "left";
+
+                // Spectrum
+                this.audioAnalyser.fftSize = 2048;
+                var buflen = this.audioAnalyser.frequencyBinCount;
+                var buffer = new Uint8Array(buflen);
+                this.audioAnalyser.getByteFrequencyData(buffer);
+
+                var indexes = [];
+                for(var i=0; i<8; i++) {
+                    indexes.push(Math.floor(buflen / 8 * i));
+                }
+                
+                (() => {
+                    ctx.translate(canvas.width / 2, 0);
+                    var stroke = ctx.strokeStyle;
+                    ctx.strokeStyle = "#fff";
+                    ctx.beginPath();
+                    indexes.reverse().forEach((i, o) => {
+                        var y = (8 + o * 11) * this.ratio;
+                        ctx.moveTo(85 * this.ratio, y);
+                        ctx.lineTo((85 + buffer[i] / 255 * 80) * this.ratio, y);
+                        ctx.moveTo(-85 * this.ratio, y);
+                        ctx.lineTo((85 + buffer[i] / 255 * 80) * -this.ratio, y);
+                    });
+                    ctx.setLineDash([5 * this.ratio, 10 * this.ratio]);
+                    ctx.lineWidth = 2 * this.ratio;
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.strokeStyle = stroke;
+                    ctx.translate(-canvas.width / 2, 0);
+                })();
+
+                ctx.shadowBlur = 0;
+
+                // Play progress
+                ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+                ctx.fillRect(0, 0, canvas.width, 7.5 * this.ratio);
+                
+                ctx.fillStyle = "#f48fb1";
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.shadowBlur = 20;
+                ctx.fillRect(0, 0, canvas.width * this.audioElem.currentTime / this.audioElem.duration, 7.5 * this.ratio);
+
+                // Difficulty
+                ctx.font = "600 " + (25 * this.ratio) + "px " + perferredFont;
+                var difficulty = this.getSongDifficulty();
+                ctx.fillStyle = difficulty.color;
+                ctx.shadowColor = ctx.fillStyle;
+                var txt = difficulty.name.toUpperCase() + " " + difficulty.level;
+                var tw = ctx.measureText(txt).width;
+                ctx.globalAlpha *= 0.2;
+                ctx.fillRect(canvas.width - tw - 60 * this.ratio, canvas.height - (25 + 40) * this.ratio, tw + 20 * this.ratio, 35 * this.ratio);
+                ctx.globalAlpha /= 0.2;
+                ctx.textBaseline = "middle";
+                ctx.fillText(txt, canvas.width - tw - 50 * this.ratio, canvas.height - (this.isSafari ? 46 : 44) * this.ratio, tw + 20 * this.ratio, 35 * this.ratio);
+                ctx.textBaseline = "alphabetic";
+
+                // Song Title - Renderer exclusive (?)
+                ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.font = "500 " + (27 * this.ratio) + "px " + perferredFont;
+                ctx.fillText(this.songMeta.title, 50 * this.ratio, canvas.height - 55 * this.ratio);
+
+                ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+                ctx.font = "500 " + (20 * this.ratio) + "px " + perferredFont;
+                ctx.fillText(this.songMeta.romanizedTitle, 50 * this.ratio, canvas.height - 30 * this.ratio);
+
+                ctx.shadowBlur = 0;
+
+                // Debug
+                ctx.font = "25px " + perferredFont;
+                // ctx.fillText(sc, 0, canvas.height);
             }
         }
+        $.Game = Game;
+
+        class Editor extends Game {
+            constructor(canvas) {
+                super(canvas, {
+                    audioCompatMode: true,
+                    keepInstance: true
+                });
+                Editor.currentEditor = this;
+
+                this.bandoriMode = true;
+
+                this.config = {
+                    gridDivisor: 0.25,
+                    offsetY: 0,
+                    scaleY: 1,
+                    autoScroll: false
+                };
+
+                this.pointer = { x: -1, y: -1 };
+
+                // Load default values.
+                this.timingPoints.push(new TimingPoints({
+                    time: 0,
+                    bpm: 100
+                }));
+
+                this.noteSize = 25;
+            }
+
+            getLastObjectTime() {
+                return this.notes[0].time;
+            }
+
+            getYByTime(time) {
+                return canvas.height - 10 * this.ratio - time * 0.2 * this.config.scaleY * this.ratio;
+            }
+
+            getModeScale() {
+                return 1;
+            }
+
+            getModeWidth() {
+                return this.canvas.width * 0.8;
+            }
+
+            update() {
+                this.noteFadeInTime = this.getLastObjectTime();
+
+                requestAnimationFrame(() => {
+                    if(Editor.currentEditor == this)
+                    this.update();
+                });
+    
+                var canvas = this.canvas;
+                var scroller = canvas.parentNode.parentNode;
+
+                var ctx = this.context;
+                var h = Math.max(window.innerHeight, canvas.height - this.getYByTime(this.getLastObjectTime()) / this.ratio + 50) + scroller.offsetHeight / 2;
+                canvas.height = scroller.offsetHeight;
+                canvas.parentNode.style.height = h;
+                var scrollY = h - scroller.scrollTop - scroller.offsetHeight;
+
+                ctx.translate(0, scrollY);
+                ctx.clearRect(0, -scrollY, canvas.width, canvas.height);
+                ctx.fillStyle = "black";
+                ctx.fillRect(0, -scrollY, canvas.width, canvas.height);
+
+                var latency = (audioContext.baseLatency || 0) + this.supportAudioContextBG ? 0 : 40;
+                var time = (this.audioElem.currentTime + latency) * 1000 + this.globalOffset;
+
+                // Draw grids
+                (() => {
+                    var y = canvas.height;
+                    var bi = 0;
+                    ctx.globalAlpha = 0.5;
+
+                    ctx.fillStyle = "#555";
+                    ctx.fillRect(canvas.width / 2 - this.getModeWidth() / 2, -scrollY, 1 * this.ratio, canvas.height);
+                    ctx.fillRect(canvas.width / 2 + this.getModeWidth() / 2, -scrollY, 1 * this.ratio, canvas.height);
+
+                    while(y >= Math.min(0, this.getYByTime(this.getLastObjectTime()))) {
+                        var beat = this.getBeatByIndex(bi);
+                        y = this.getYByTime(beat.time);
+                        var beatLen = this.getBeatLengthAt(beat.time);
+
+                        ctx.fillStyle = "white";
+                        ctx.fillRect(0, y, canvas.width, 2 * this.ratio);
+
+                        y = this.getYByTime(beat.time + beatLen * 0.5);
+                        ctx.fillStyle = "#888";
+                        ctx.fillRect(0, y, canvas.width, this.ratio);
+
+                        y = this.getYByTime(beat.time + beatLen * 0.25);
+                        ctx.fillStyle = "#42a5f5";
+                        ctx.fillRect(0, y, canvas.width, this.ratio);
+
+                        y = this.getYByTime(beat.time + beatLen * 0.75);
+                        ctx.fillRect(0, y, canvas.width, this.ratio);
+
+                        bi++;
+                        
+                        ctx.fillStyle = "#fff";
+                        ctx.font = "500 " + (16 * this.ratio) + "px " + perferredFont;
+                        ctx.fillText(bi + "", 0, y - 3 * this.ratio);
+                    }
+                    ctx.globalAlpha = 1;
+                })();
+
+                this.timingPoints.forEach(p => {
+                    var y = this.getYByTime(p.time);
+                    ctx.textAlign = "right";
+                    ctx.fillStyle = "#fc2";
+                    ctx.fillRect(0, y, canvas.width, this.ratio);
+                    ctx.font = "400 " + (13 * this.ratio) + "px " + perferredFont;
+                    ctx.fillText("BPM: " + p.bpm, canvas.width - 3 * this.ratio, y - 3 * this.ratio);
+                    ctx.textAlign = "left";
+                });
+
+                var w = this.getModeWidth();
+                this.notes.forEach(n => {
+                    if(!n.game) n.game = this;
+                    if(n instanceof SliderNote) {
+                        n.nodes.forEach(nn => {
+                            if(!nn.game) nn.game = this;
+                        });
+                    }
+
+                    ctx.globalAlpha = 0.5;
+                    var isHovering = Math.abs(this.pointer.x - (canvas.width / 2 + n.x * w / 2)) <= this.noteSize * 1.1 &&
+                        Math.abs(this.pointer.y - (this.getYByTime(n.time) + scrollY)) <= this.noteSize * 1.1;
+                    if(isHovering) {
+                        ctx.globalAlpha = 0.2;
+                        ctx.beginPath();
+                        ctx.fillStyle = "#f48fb1";
+                        ctx.arc(canvas.width / 2 + n.x * w / 2, this.getYByTime(n.time), this.noteSize * 1.5, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.globalAlpha = 1;
+                    }
+                    n.render(ctx, 0);
+
+                    if(isHovering && this.pointer.clicked) {
+                        console.log(this.notes.indexOf(n));
+                        this.audioElem.currentTime = n.time / 1000;
+                    }
+                    ctx.globalAlpha = 1;
+                });
+
+                var scanlineY = this.getYByTime(time);
+                ctx.fillStyle = "red";
+                ctx.fillRect(0, scanlineY, canvas.width, 1);
+
+                if(this.config.autoScroll && !this.audioElem.paused) {
+                    scroller.scroll(0, canvas.parentNode.offsetHeight - canvas.offsetHeight * 1.75 + scanlineY);
+                }
+                
+                ctx.translate(0, -scrollY);
+
+                this.pointer.clicked = false;
+            }
+        }
+        $.Editor = Editor;
         
         class Note {
             constructor({x: x, time: time, snap: snap}) {
                 this.x = x || 0;
                 this.time = time || 0;
-                this.cleared = false;
                 this.soundPlayed = false;
+7
+                // Gameplay mechanism
+                this.cleared = false;
+                this.accuracy = 0;
+                
+                this.snap = snap || 0;7
+            }
 
-                this.snap = snap || 0;
+            getDefaultColor() {
+                var game = this.game || Game.currentGame;
+                return game.getDirection(this.time) > 0 ? "#0af" : "#00bfa5";
             }
         
             render(ctx, time) {
                 // Needs further implementation
                 if(time >= this.time) {
                     this.cleared = true;
+                    this.accuracy = 1;
                 } else {
                     this.cleared = false;
+                    this.accuracy = 0;
                     this.soundPlayed = false;
                 }
 
-                if(Game.currentGame.enableClickSound && this.cleared && !this.soundPlayed) {
-                    this.soundPlayed = true;
-                    
-                    if(hitsoundBuffer != null) {
-                        var src = audioContext.createBufferSource();
-                        src.buffer = hitsoundBuffer;
+                // Playing sound in suspended state will result in
+                // too many sounds playing in the same time, which causes
+                // sound cracking, immediately after being unmuted.
+                var game = this.game || Game.currentGame;
+                if(audioContext.state != "suspended") {
+                    if(game.enableClickSound && this.cleared && !this.soundPlayed) {
+                        this.soundPlayed = true;
+                        
+                        if(hitsoundBuffer != null) {
+                            var src = audioContext.createBufferSource();
+                            src.buffer = hitsoundBuffer;
 
-                        var gain = audioContext.createGain();
-                        gain.gain.value = 0.125;
+                            var gain = audioContext.createGain();
+                            gain.gain.value = 0.125;
 
-                        src.connect(gain).connect(audioContext.destination);
-                        src.start();
+                            src.connect(gain).connect(audioContext.destination);
+                            src.start();
+                        }
                     }
                 }
             }
@@ -643,7 +1134,7 @@ try {
 
         class CircleNote extends Note {
             render(ctx, time) {
-                var game = Game.currentGame;
+                var game = this.game || Game.currentGame;
                 var fadeInTime = game.getModeFadeIn();
                 var fadeOutTime = game.noteFadeOutTime;
 
@@ -663,14 +1154,14 @@ try {
                 var lineWidth = ctx.lineWidth;
                 var alpha = ctx.globalAlpha;
 
-                var size = game.noteSize * game.getModeScale();
+                var size = game.noteSize * game.getModeScale() * game.ratio;
                 ctx.strokeStyle = "white";
                 ctx.lineWidth = size * 0.15;
-                ctx.fillStyle = game.getDirection(this.time) > 0 ? "#0af" : "#f05";
+                ctx.fillStyle = this.getDefaultColor();
                 if(time > this.time) {
-                    ctx.globalAlpha = KLerp(0, 0.5, progress);
+                    ctx.globalAlpha = alpha * KLerp(0, 0.5, progress);
                 } else {
-                    ctx.globalAlpha = KLerp(progress, 1, progress);
+                    ctx.globalAlpha = alpha * KLerp(progress, 1, progress);
                 }
 
                 var y = game.getYByTime(this.time);
@@ -699,7 +1190,7 @@ try {
 
         class FlickNote extends Note {
             render(ctx, time) {
-                var game = Game.currentGame;
+                var game = this.game || Game.currentGame;
                 var fadeInTime = game.getModeFadeIn();
                 var fadeOutTime = game.noteFadeOutTime;
 
@@ -719,14 +1210,14 @@ try {
                 var lineWidth = ctx.lineWidth;
                 var alpha = ctx.globalAlpha;
 
-                var size = game.noteSize * game.getModeScale();
+                var size = game.noteSize * game.getModeScale() * game.ratio;
                 ctx.strokeStyle = "white";
                 ctx.lineWidth = size * 0.15;
-                ctx.fillStyle = game.getDirection(this.time) > 0 ? "#0af" : "#f05";
+                ctx.fillStyle = this.getDefaultColor();
                 if(time > this.time) {
-                    ctx.globalAlpha = KLerp(0, 0.5, progress);
+                    ctx.globalAlpha = alpha * KLerp(0, 0.5, progress);
                 } else {
-                    ctx.globalAlpha = KLerp(progress, 1, progress);
+                    ctx.globalAlpha = alpha * KLerp(progress, 1, progress);
                 }
 
                 var y = game.getYByTime(this.time);
@@ -844,7 +1335,7 @@ try {
             }
 
             render(ctx, time) {
-                var game = Game.currentGame;
+                var game = this.game || Game.currentGame;
                 var fadeInTime = game.getModeFadeIn();
                 var fadeOutTime = game.noteFadeOutTime;
 
@@ -869,7 +1360,7 @@ try {
                 var lineWidth = ctx.lineWidth;
                 var alpha = ctx.globalAlpha;
 
-                var size = game.noteSize * 0.5 * game.getModeScale();
+                var size = game.noteSize * 0.5 * game.getModeScale() * game.ratio;
 
                 // Since that make the view nonsense when the next node is in the next beat,
                 // we will use vector linear interpolation during active time.
@@ -893,9 +1384,9 @@ try {
 
                     if(time < n.time + fadeOutTime && time > n.time - fadeInTime) {
                         if(time > n.time) {
-                            ctx.globalAlpha = KLerp(0, 0.5, np);
+                            ctx.globalAlpha = alpha * KLerp(0, 0.5, np);
                         } else {
-                            ctx.globalAlpha = KLerp(np, 1, np);
+                            ctx.globalAlpha = alpha * KLerp(np, 1, np);
                         }
 
                         if(time >= prevNode.time && time < n.time) {
@@ -914,7 +1405,7 @@ try {
 
                         var sp = {x: prevLocation.x, y: prevLocation.y};
                         var ep = {x: centerX + n.x * width / 2 * (game.mirrored ? -1 : 1), y: ny};
-                        var pad = KV2Mult(KV2Normalize(KV2Add(ep, KV2Mult(sp, -1))), 30);
+                        var pad = KV2Mult(KV2Normalize(KV2Add(ep, KV2Mult(sp, -1))), size * 1.5);
 
                         sp = KV2Add(sp, pad);
                         ep = KV2Add(ep, KV2Mult(pad, -1));
@@ -927,7 +1418,7 @@ try {
                         ctx.moveTo(ep.x, ep.y);
                         ctx.lineTo(sp.x, sp.y);
                         ctx.lineWidth = size * 0.15;
-                        ctx.setLineDash([10, 10]);
+                        ctx.setLineDash([size * 0.5, size * 0.5]);
                         ctx.stroke();
                         ctx.setLineDash([]);
                         ctx.restore();
@@ -941,11 +1432,11 @@ try {
                 });
 
                 ctx.lineWidth = size * 0.5;
-                ctx.fillStyle = "#0f5";
+                ctx.fillStyle = "#ab47bc";
                 if(time > this.getLastNodeTime()) {
-                    ctx.globalAlpha = KLerp(0, 0.5, progress);
+                    ctx.globalAlpha = alpha * KLerp(0, 0.5, progress);
                 } else {
-                    ctx.globalAlpha = KLerp(progress, 1, progress);
+                    ctx.globalAlpha = alpha * KLerp(progress, 1, progress);
                 }
 
                 ctx.beginPath();
@@ -989,7 +1480,7 @@ try {
             }
 
             drawHoldNote(ctx, time, startY, endY, color) {
-                var game = Game.currentGame;
+                var game = this.game || Game.currentGame;
                 var fadeInTime = game.getModeFadeIn();
                 var fadeOutTime = game.noteFadeOutTime;
 
@@ -1013,17 +1504,16 @@ try {
                 var fill = ctx.fillStyle;
                 var lineWidth = ctx.lineWidth;
                 var alpha = ctx.globalAlpha;
-                var direction = game.getDirection(this.time);
 
-                var size = game.noteSize * game.getModeScale();
+                var size = game.noteSize * game.getModeScale() * game.ratio;
                 
                 ctx.strokeStyle = "white";
 
                 ctx.fillStyle = color;
                 if(time > this.getEndTime()) {
-                    ctx.globalAlpha = KLerp(0, 0.5, progress);
+                    ctx.globalAlpha = alpha * KLerp(0, 0.5, progress);
                 } else {
-                    ctx.globalAlpha = KLerp(progress, 1, progress);
+                    ctx.globalAlpha = alpha * KLerp(progress, 1, progress);
                 }
                 var a = ctx.globalAlpha;
                 var c = ctx.fillStyle;
@@ -1032,7 +1522,7 @@ try {
                 var y = game.getYByTime(this.time);
 
                 ctx.lineWidth = KLerp(0.35, 1, progress) * size;
-                ctx.setLineDash([8, 8]);
+                ctx.setLineDash([size * 0.15, size * 0.15]);
                 ctx.beginPath();
                 ctx.moveTo(x, startY);
                 ctx.lineTo(x, endY);
@@ -1052,7 +1542,7 @@ try {
                     // Beat indicator
                     var gy = game.getYByTime(time);
                     var a = ctx.globalAlpha;
-                    ctx.globalAlpha = 0.2;
+                    ctx.globalAlpha = a * 0.2;
                     ctx.beginPath();
                     ctx.arc(x, game.bandoriMode ? gy : y, Math.max(0, progress * size * KLerp(1.75, 1.25, bp)), 0, Math.PI * 2);
                     ctx.fill();
@@ -1064,11 +1554,11 @@ try {
                     ctx.save();
                     ctx.beginPath();
                     ctx.moveTo(0, gy);
-                    ctx.lineTo(x, game.bandoriMode ? gy : y);
+                    ctx.lineTo(x, y);
                     ctx.lineTo(canvas.width, gy);
                     ctx.clip();
                     ctx.beginPath();
-                    ctx.setLineDash([5, 10]);
+                    ctx.setLineDash([5 * game.ratio, 10 * game.ratio]);
                     ctx.strokeStyle = "rgba(255, 255, 255, " + a * 0.2 +")";
                     ctx.moveTo(0, 0);
                     ctx.lineTo(canvas.width, canvas.height);
@@ -1116,17 +1606,17 @@ try {
             }
 
             render(ctx, time) {
-                var game = Game.currentGame;
+                var game = this.game || Game.currentGame;
                 var direction = game.getDirection(this.time);
                 var y = game.getYByTime(this.time);
                 var endY = game.getYByTime(this.endTime);
-                this.drawHoldNote(ctx, time, y, endY, direction > 0 ? "#0af" : "#f05");
+                this.drawHoldNote(ctx, time, y, endY, direction > 0 ? "#ec407a" : "#e53935");
             }
         }
 
         class LongHoldNote extends HoldNote {
             render(ctx, time) {
-                var game = Game.currentGame;
+                var game = this.game || Game.currentGame;
                 var direction = game.getDirection(this.time);
 
                 var sy = direction > 0 ? 0 : canvas.height;
@@ -1140,9 +1630,6 @@ try {
                 this.drawHoldNote(ctx, time, sy, ey, "#fc2");
             }
         }
-
-        // Export our Game class.
-        $.Game = Game;
     })(window);
 } catch(ex) {
     // We will think of a new way to warn about initialization errors.
