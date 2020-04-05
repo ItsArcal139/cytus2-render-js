@@ -1090,7 +1090,7 @@ try {
                 this.cleared = false;
                 this.accuracy = 0;
                 
-                this.snap = snap || 0;7
+                this.snap = snap || 0;
             }
 
             getDefaultColor() {
