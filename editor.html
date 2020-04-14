@@ -22,8 +22,10 @@
     <script src="game.js"></script>
     <script>
         var canvas = document.getElementById("main");
-        var editor = window.currentEditor = new Editor(canvas);
-
+        var editor = window.currentEditor = new Editor(canvas, {
+            audioCompatMode: hasQuery("audioCompat")
+        });
+        
         var handler = e => {
             e.preventDefault();
             if(audioContext.state == "suspended") {

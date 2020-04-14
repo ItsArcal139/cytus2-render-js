@@ -80,7 +80,7 @@ try {
             }
         }
 
-        var fpsWarning = new LogLine("FPS is lower than 20 on your browser. This is best suit on PC/Mac or iOS devices.");
+        var fpsWarning = new LogLine("FPS is lower than 20 on your browser. Consider switching to low resolution mode in debug menu.");
         fpsWarning.badgeText = "Renderer";
         fpsWarning.badgeColor = "#f50";
         fpsWarning.hidden = true;
@@ -105,10 +105,10 @@ try {
                 }
         
                 this.canvas = canvas;
-                this.ratio = 1;
                 this._initSize = {
                     w: canvas.width, h: canvas.height
                 };
+                this.toLowRes();
 
                 this.bandoriMode = false;
                 this.bandoriSpeed = 5;
@@ -133,11 +133,7 @@ try {
                     .then(response => response.arrayBuffer())
                     .then(buffer => audioContext.decodeAudioData(buffer, b => {
                         hitsoundBuffer = b
-                    }, ex => alert(ex)))
-
-                // Viewport
-                this.fieldWidth = canvas.width * 0.7;
-                this.fieldHeight = canvas.height * 0.65;
+                    }, ex => alert(ex)));
 
                 this.startTime = performance.now();
                 this.resetScanlineAt = 0;
@@ -215,12 +211,20 @@ try {
                 this.ratio = window.devicePixelRatio;
                 canvas.width = this._initSize.w * this.ratio;
                 canvas.height = this._initSize.h * this.ratio;
+
+                // Viewport
+                this.fieldWidth = canvas.width * 0.7;
+                this.fieldHeight = canvas.height * 0.65;
             }
 
             toLowRes() {
                 this.ratio = 1;
                 canvas.width = this._initSize.w;
                 canvas.height = this._initSize.h;
+
+                // Viewport
+                this.fieldWidth = canvas.width * 0.7;
+                this.fieldHeight = canvas.height * 0.65;
             }
 
             getSongDifficulty() {
@@ -1216,22 +1220,22 @@ try {
 
                     if(line.fadedTime != null && pn - line.fadedTime > 500 && !line.persistent) {
                         removalLines.push(this.logLines.length - 1 - i);
-                    }
+                    } 
 
                     if(this.enableDebugLog && line.y > -100) {
                         ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
                         ctx.fillRect(0, line.y, canvas.width, 30);
 
-                        ctx.font = "18px " + perferredFont;
+                        ctx.font = "600 18px " + perferredFont;
                         var badgeWidth = ctx.measureText(line.badgeText).width;
                         ctx.fillStyle = line.badgeColor;
-                        ctx.fillRect(10, line.y + 2, badgeWidth + 10, 26);
+                        ctx.fillRect(10, line.y + 3, badgeWidth + 12, 26);
                         ctx.fillStyle = line.badgeTextColor;
-                        ctx.fillText(line.badgeText, 15, line.y + 17);
+                        ctx.fillText(line.badgeText, 16, line.y + 17);
 
                         ctx.fillStyle = "white";
-                        ctx.font = "20px " + perferredFont;
-                        ctx.fillText(line.content, 30 + badgeWidth, line.y + 17);
+                        ctx.font = "600 19px " + perferredFont;
+                        ctx.fillText(line.content, 32 + badgeWidth, line.y + 18);
                     }
                     ctx.globalAlpha = 1;
                 });
@@ -1249,7 +1253,7 @@ try {
         $.Game = Game;
 
         class Editor extends Game {
-            constructor(canvas) {
+            constructor(canvas, options) {
                 super(canvas, {
                     audioCompatMode: true,
                     keepInstance: true
@@ -1274,6 +1278,13 @@ try {
                 }));
 
                 this.noteSize = 25;
+
+                this.logLines.shift();
+                this.pointerLog = new LogLine("Mouse");
+                this.pointerLog.persistent = true;
+                this.pointerLog.badgeText = "Mouse";
+                this.pointerLog.badgeColor = "#085";
+                this.logLines.unshift(this.pointerLog);
             }
 
             getLastObjectTime() {
@@ -1285,12 +1296,16 @@ try {
                 return ch - 10 * this.ratio - time * 0.2 * this.config.scaleY * this.ratio;
             }
 
+            getModeFadeIn() {
+                return 9999999999;
+            }
+
             getModeScale() {
                 return 1;
             }
 
             getModeWidth() {
-                return this.cw * 0.8;
+                return this.canvas.width * 0.8;
             }
 
             update() {
@@ -1300,6 +1315,14 @@ try {
                     if(Editor.currentEditor == this)
                     this.update();
                 });
+
+                var deltaTime = performance.now() - this.lastRenderTime;
+                if(deltaTime < 1000 / this.maxFPS) return;
+
+                fpsWarning.hidden = deltaTime < 1000 / 20;
+
+                this.lastRenderTime = performance.now();
+                this.pointerLog.content = `x: ${this.pointer.x}, y: ${this.pointer.y}`;
     
                 var canvas = this.canvas;
                 var scroller = canvas.parentNode.parentNode;
@@ -1344,6 +1367,12 @@ try {
                         y = this.getYByTime(beat.time);
                         var beatLen = this.getBeatLengthAt(beat.time);
 
+                        bi++;
+                        
+                        ctx.fillStyle = "#fff";
+                        ctx.font = "500 " + (13 * this.ratio) + "px " + perferredFont;
+                        ctx.fillText(bi + "", 5 * this.ratio, y - 3 * this.ratio);
+
                         ctx.fillStyle = "white";
                         ctx.fillRect(0, y, cw, 2 * this.ratio);
 
@@ -1357,12 +1386,6 @@ try {
 
                         y = this.getYByTime(beat.time + beatLen * 0.75);
                         ctx.fillRect(0, y, cw, this.ratio);
-
-                        bi++;
-                        
-                        ctx.fillStyle = "#fff";
-                        ctx.font = "500 " + (16 * this.ratio) + "px " + perferredFont;
-                        ctx.fillText(bi + "", 0, y - 3 * this.ratio);
                     }
                     ctx.globalAlpha = 1;
                 })();
@@ -1373,7 +1396,7 @@ try {
                     ctx.fillStyle = "#fc2";
                     ctx.fillRect(0, y, cw, this.ratio);
                     ctx.font = "400 " + (13 * this.ratio) + "px " + perferredFont;
-                    ctx.fillText("BPM: " + p.bpm, cw - 3 * this.ratio, y - 3 * this.ratio);
+                    ctx.fillText("BPM: " + p.bpm, cw - 5 * this.ratio, y - 3 * this.ratio);
                     ctx.textAlign = "left";
                 });
 
@@ -1401,7 +1424,6 @@ try {
                     n.render(ctx, 0);
 
                     if(isHovering && this.pointer.clicked) {
-                        console.log(this.notes.indexOf(n));
                         this.audioElem.currentTime = n.time / 1000;
                     }
                     ctx.globalAlpha = 1;
@@ -1418,6 +1440,72 @@ try {
                 ctx.translate(0, -scrollY);
 
                 this.pointer.clicked = false;
+
+                 // Debug Content
+                 resLog.content = `Resolution: ${this.canvasSize.w}x${this.canvasSize.h} @ ${Math.round(this.ratio*10)/10}x`;
+                 fpsLog.content = "FPS: " + (Math.round(100000 / deltaTime) / 100);
+ 
+                 // Debug
+                 ctx.textBaseline = "middle";
+                 var removalLines = [];
+                 var pn = performance.now();
+                 var counter = 0;
+                 var persistentCount = 0;
+                 var persistentRenderCount = 0;
+                 this.logLines.forEach(l => (l.persistent && !l.hidden) ? persistentCount++ : 0);
+ 
+                 this.logLines.reverse().forEach((line, i) => {
+                     if(!line.createdTime) {
+                         line.createdTime = performance.now();
+                     }
+ 
+                     ctx.globalAlpha = Math.sqrt(Math.max((pn - line.createdTime) / 100, 0));
+ 
+                     if((!line.persistent ? persistentCount - persistentRenderCount : 0) + counter >= this.debugLogCount || line.hidden) {
+                         if(!line.fadedTime) {
+                             line.fadedTime = performance.now() + 100;
+                         }
+                         ctx.globalAlpha = KLerp(0, ctx.globalAlpha, Math.max((line.fadedTime - pn) / 100, 0));
+                     } else {
+                         counter++;
+                         if(!!line.fadedTime) {
+                             line.fadedTime = null;
+                             line.createdTime = performance.now();
+                         }
+                         if(line.persistent) persistentRenderCount++;
+                     }
+ 
+                     var targetY = canvas.height - counter * 35;
+                     line.y = KLerp(line.y || targetY + 30, targetY, Math.min(1, deltaTime / 100));
+ 
+                     if(line.fadedTime != null && pn - line.fadedTime > 500 && !line.persistent) {
+                         removalLines.push(this.logLines.length - 1 - i);
+                     } 
+ 
+                     if(this.enableDebugLog && line.y > -100) {
+                         ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+                         ctx.fillRect(0, line.y, canvas.width, 30);
+ 
+                         ctx.font = "600 18px " + perferredFont;
+                         var badgeWidth = ctx.measureText(line.badgeText).width;
+                         ctx.fillStyle = line.badgeColor;
+                         ctx.fillRect(10, line.y + 3, badgeWidth + 12, 26);
+                         ctx.fillStyle = line.badgeTextColor;
+                         ctx.fillText(line.badgeText, 16, line.y + 17);
+ 
+                         ctx.fillStyle = "white";
+                         ctx.font = "600 19px " + perferredFont;
+                         ctx.fillText(line.content, 32 + badgeWidth, line.y + 18);
+                     }
+                     ctx.globalAlpha = 1;
+                 });
+                 this.logLines.reverse(); // Why it is mutating!?? WTF?
+ 
+                 removalLines.forEach(l => {
+                     this.removeLogLine(null, l);
+                 });
+ 
+                 ctx.textBaseline = "alphabetic";
             }
         }
         $.Editor = Editor;
@@ -1753,11 +1841,12 @@ try {
                     var pad = KV2Mult(nm, size * 1.5);
 
                     if(time < prevNode.time + fadeOutTime && time > prevNode.time - nFadeInTime && !(prevNode instanceof SliderNote)) {
+                        var m = ctx.getTransform();
                         ctx.translate(sp.x, sp.y);
                         ctx.transform(-nm.y, nm.x, -nm.x, -nm.y, 0, 0);
                         var asz = Math.max(0, KLerp(0.5, 1, prevNp) * size * 1.5 * 0.45);
                         ctx.drawImage(arrowUpIcon, -asz / 2, -asz / 2 - 0.05 * size, asz, asz);
-                        ctx.setTransform(1, 0, 0, 1, 0, 0);
+                        ctx.setTransform(m);
                     }
 
                     if(time < n.time + fadeOutTime && np > 0) {
