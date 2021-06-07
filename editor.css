@@ -6,6 +6,10 @@ body {
     height: calc(100% - 50px);
     max-height: calc(100% - 50px);
     overflow-y: scroll;
+    position: absolute;
+    width: 550px;
+    top: 0;
+    right: 0;
 }
 
 .canvas-scroller canvas {

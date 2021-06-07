@@ -11,18 +11,21 @@
         <meta charset="utf-8" />
     </head>
     <body>
-        <audio src="./assets/audio/m.mp3" id="game-audio" controls></audio>
+        <audio src="./assets/audio/m.mp3" id="game-audio" controls></audio><br/>
         <div class="canvas-scroller">
             <div>
                 <canvas id="main" width="550" height="720"></canvas>
             </div>
         </div>
+        <canvas id="preview" width="1280" height="720" style="width: 980px"></canvas>
     </body>
     <script src="dat.gui.min.js"></script>
+    <script src="utils.js"></script>
     <script src="game.js"></script>
     <script>
         var canvas = document.getElementById("main");
-        var editor = window.currentEditor = new Editor(canvas, {
+        var preview = document.getElementById("preview");
+        var editor = window.currentEditor = new Editor(canvas, preview, {
             audioCompatMode: hasQuery("audioCompat")
         });
         

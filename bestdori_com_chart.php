@@ -1,6 +1,5 @@
 <?php
     $id = $_GET["id"];
-    $level = $_GET["level"];
 
     $curl = curl_init("https://bestdori.com/api/post/details?id=".$id);
     curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
