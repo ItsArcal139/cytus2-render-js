@@ -214,11 +214,13 @@ export class Renderer {
     }
 
     public setupOtherAssets() {
-        for(var i=0; i<=85; i++) {
-            Assets.loadImageAsset("mm_" + i, `./assets/mm/MM_Logo-MM_Logo_000${i<10?"0":""}${i}.png`);
+        if(!this.noRayarkTexture) {
+            for(var i=0; i<=85; i++) {
+                Assets.loadImageAsset("mm_" + i, `./assets/mm/MM_Logo-MM_Logo_000${i<10?"0":""}${i}.png`);
+            }
+            Assets.loadAudioAsset("mm_audio", "./assets/mm/mm_sound.wav");
+            Assets.loadAudioAsset("click_fx", "./assets/tapFX_3.wav");
         }
-        Assets.loadAudioAsset("mm_audio", "./assets/mm/mm_sound.wav");
-        Assets.loadAudioAsset("click_fx", "./assets/tapFX_3.wav");
         Assets.loadAudioAsset("click_fx2", "./assets/soft-hitnormal.wav");
         Assets.loadImageAsset("muted", "./assets/mute-3-xxl.png");
         Assets.loadImageAsset("hold_strip", "./assets/hold-strip.png");
