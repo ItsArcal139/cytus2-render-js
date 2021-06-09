@@ -1093,9 +1093,7 @@ export class Renderer {
                 }
             }
 
-            for(var i = holdNotes.length - 1; i >= 0; i--) {
-                var h = holdNotes[i];
-
+            holdNotes.forEach(h => {
                 try {
                     h.update(this);
                 } catch(ex) {
@@ -1104,10 +1102,9 @@ export class Renderer {
                     line.badge.background = "#ff7b51";
                     this.debugLines.push(line);
                 }
-            }
+            });
 
-            for(var i = sliderNotes.length - 1; i >= 0; i--) {
-                var note = sliderNotes[i];
+            sliderNotes.forEach(note => {
                 var endTime = this.tickTimeMap[note.getEndTick()];
                 var startTime = this.tickTimeMap[note.tick] - note.duration;
                 var time = this.playbackTime * 1000;
@@ -1115,15 +1112,13 @@ export class Renderer {
                 if(time > startTime && time < endTime) {
                     note.drawDashedPath(this);
                 }
-            }
+            });
 
             var rNotes: Note[] = [];
             rNotes.push.apply(rNotes, sliderNotes);
             rNotes.push.apply(rNotes, otherNotes);
 
-            for(var i = rNotes.length - 1; i >= 0; i--) {
-                var n = rNotes[i];
-
+            rNotes.forEach(n => {
                 try {
                     n.update(this);
                 } catch(ex) {
@@ -1132,7 +1127,7 @@ export class Renderer {
                     line.badge.color = "#ff7b51";
                     this.debugLines.push(line);
                 }
-            }
+            });
         }
     }
 

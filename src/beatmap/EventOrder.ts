@@ -122,10 +122,6 @@ export class EventOrder {
             })();
 
             ctx.textBaseline = "middle";
-            ctx.globalAlpha = alpha * 0.25;
-            ctx.fillStyle = "#000";
-            drawText(text, y + 10 * game.ratio);
-
             ctx.globalAlpha = alpha;
             ctx.fillStyle = (() => {
                 if(this.type == 8) {
