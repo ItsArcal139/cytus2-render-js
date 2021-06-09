@@ -1,0 +1,20 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Electrolize&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro&display=swap');
+
+canvas#main, audio#game-audio {
+    width: 100%;
+}
+
+.dg.ac {
+    z-index: 9999 !important;
+}
+
+.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000 !important;
+}

@@ -1,0 +1,102 @@
+<html lang="zh-TW">
+    <head>
+        <meta charset="utf-8" />
+        <title>Cytus 2 譜面模擬器</title>
+        <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+        <link rel="stylesheet" href="style.css" />
+        <link href="https://fonts.googleapis.com/css2?family=Exo:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+        <meta name="viewport" content="width=device-width, initial-scale=0.8, viewport-fit=cover" />
+    </head>
+    <body>
+        <nav class="navbar navbar-nav navbar-expand-lg navbar-dark bg-dark">
+            <div class="container pl-3">
+                <span class="navbar-brand">Cytus 2 譜面模擬器</span>
+            </div>
+        </nav>
+        <div class="container pt-3">
+            <canvas id="main" class="" width="1920" height="1080"></canvas>
+            <div class="accordion my-3">
+                <div class="card">
+                    <!-- Collapse toggle area -->
+                    <div class="card-header">
+                        <h2 class="mb-0">
+                            <button class="btn btn-link" data-toggle="collapse" data-target="#basic-config">基本設定</button>
+                        </h2>
+                    </div>
+
+                    <!-- Collapsed area -->
+                    <div class="collapse show" id="basic-config">
+                        <div class="p-3">
+                            <audio id="game-audio" controls>
+                                <source src="./assets/audio/bgm085.mp3" autoplay loop />
+                            </audio>
+                            <div class="container mt-3 row">
+                                <div class="col-lg">
+                                    <div class="input-group mb-3">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text" id="basic-addon1">播放速度</span>
+                                        </div>
+                                        <div class="btn-group" role="group" aria-label="Basic example">
+                                            <button type="button" class="btn btn-secondary" onclick="switchSpeed(this)">0.5x</button>
+                                            <button type="button" class="btn btn-secondary" onclick="switchSpeed(this)">0.75x</button>
+                                            <button type="button" class="btn btn-secondary" onclick="switchSpeed(this)">1x</button>
+                                            <button type="button" class="btn btn-secondary" onclick="switchSpeed(this)">1.25x</button>
+                                            <button type="button" class="btn btn-secondary" onclick="switchSpeed(this)">1.5x</button>
+                                            <button type="button" class="btn btn-secondary" onclick="switchSpeed(this)">2x</button>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="btn" onclick="switchBandori()" id="switch-bandori">切換 Cytus/Bandori 模式</button>
+                                    <button type="button" class="btn btn-primary" onclick="setupDebugger(this)" id="enable-debugger">啟用進階選項</button>
+                                </div>
+                                <div class="col-lg">
+                                    <button type="button" class="btn btn-primary" onclick="fullScreen()">全螢幕並播放</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-header">
+                        <h2 class="mb-0">
+                            <button class="btn btn-link" data-toggle="collapse" data-target="#c2_id-table">Cytus 2 譜面</button>
+                        </h2>
+                    </div>
+                    <div class="collapse show" id="c2_id-table">
+                        <div class="p-3">
+                            
+                            <div class="input-group mb-3">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text" id="label-chart">譜面</span>
+                                </div>
+                                <input type="file" class="form-control" id="input-chart" />
+                            </div>
+                            
+                            <div class="input-group mb-3">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text" id="label-audio">音檔</span>
+                                </div>
+                                <input type="file" class="form-control" id="input-audio" />
+                            </div>
+
+                            <input type="checkbox" id="remove-first-page" />
+                            <span>移除第一頁</span><br/>
+
+                            <button class="mb-3 btn btn-primary" onclick="loadChart()">載入</button>
+
+                            <button class="mb-3 btn btn-secondary" onclick="loadTables()">重新整理</button>
+                            <table class="table" id="c2-map-table">
+                                <tr>
+                                    <th scope="col">#</th><th scope="col">歌名</th><th scope="col"> </th>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+    <script src="dat.gui.min.js"></script>
+    <script src="bundle.js"></script>
+</html>

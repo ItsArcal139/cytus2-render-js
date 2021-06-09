@@ -1,11 +1,6 @@
 index.php
-style.css
 
 # You can setup these on your own.
+dist/**/*
+bundle.js
 assets/song_database.json
-assets/bandori/*
-assets/charts/*
-assets/bestoriraw/*
-assets/audio/*
-assets/*.png
-assets/*.jpg
