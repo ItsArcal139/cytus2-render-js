@@ -188,7 +188,7 @@ export function loadC2RawByButton(btn: HTMLButtonElement) {
                 aid += "_" + item.level;
             }
 
-            fetch("./assets/game/songdata/" + sid + "/game/common/bundleassets/chartdata/" + sid + "/" + sid + "_" + item.level + ".bytes", {
+            fetch("../cytus2/assets/game/songdata/" + sid + "/game/common/bundleassets/chartdata/" + sid + "/" + sid + "_" + item.level + ".bytes", {
                 cache: "no-cache"
             })
                 .then(r => r.text())
@@ -198,11 +198,11 @@ export function loadC2RawByButton(btn: HTMLButtonElement) {
                     }).then(_ => _.json()).then(tj => {
                         var m = Beatmap.deserialize(JSON.parse(j));
                         Renderer.current.parseMap(m, {
-                            audio: "./assets/game/songdata/" + sid + "/game/common/bundleassets/musics/" + sid + "/" + aid + ".wav",
-                            background: "./assets/game/songpackbgs/" + item.artist + ".png",
+                            audio: "../cytus2/assets/game/songdata/" + sid + "/game/common/bundleassets/musics/" + sid + "/" + aid + ".wav",
+                            background: "../cytus2/assets/game/songpackbgs/" + item.artist + ".png",
                             title: item.title,
                             difficulty: item.difficulty,
-                            icon: "./assets/game/charactericons/" + item.artist + "_l.png",
+                            icon: "../cytus2/assets/game/charactericons/" + item.artist + "_l.png",
                             themeColor: tj[item.artist] || "#fff"
                         });
                     });

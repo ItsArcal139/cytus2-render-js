@@ -1,4 +1,5 @@
 import { Assets } from "../Assets";
+import { JudgeEffect } from "../JudgeEffect";
 import { Renderer } from "../Renderer";
 import { Maths } from "../utils/Maths";
 import { Serializer } from "../utils/Serializer";
@@ -130,10 +131,16 @@ export class Note {
             if(this.clickPlayedTime == null) {
                 this.clickPlayedTime = game.playbackTime;
                 if(game.enableClickSound) {
-                    game.playOneShotAudio(Assets.click_fx);
+                    game.playOneShotAudio(game.noRayarkTexture ? Assets.click_fx2 : Assets.click_fx);
                 }
                 if(game.enableTaptic) {
                     if(navigator.vibrate) navigator.vibrate(15);
+                }
+                if(game.noRayarkTexture) {
+                    var x = (game.canvas.width - game.getModeWidth()) / 2 + this.x * game.getModeWidth();
+                    var y = game.getYPosition(page, this.tick);
+                    var effect = new JudgeEffect(game, x, y, 10);
+                    game.animatedObjects.push(effect);
                 }
             }
         } else {
@@ -156,6 +163,7 @@ export class Note {
         // For type check
         if(game.chart == null) return;
         if(this.clearTime == null) return;
+        if(game.noRayarkTexture) return;
 
         var tick = game.currentTick;
         var page = game.chart.pages[this.pageIndex];

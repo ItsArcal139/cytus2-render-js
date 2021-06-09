@@ -69,7 +69,7 @@ export class SliderNode extends Note implements Slidable {
     }
 
     /** @param {Game} game */
-    renderVector(game: Renderer) {
+    public renderVector(game: Renderer) {
         super.renderVector(game);
 
         // For type check
@@ -106,17 +106,17 @@ export class SliderNode extends Note implements Slidable {
             if(game.bandoriMode) y = game.getYPosition(page, tick);
         }
 
-        var size = s * 30 * game.noteSize;
+        var size = s * 30 * game.noteSize * game.ratio;
         ctx.beginPath();
         ctx.shadowColor = ctx.fillStyle;
-        ctx.shadowBlur = 60;
+        ctx.shadowBlur = 30 * game.ratio;
         ctx.strokeStyle = "#fff";
         ctx.lineWidth = size * 0.4;
-        ctx.arc(x, y, size * game.ratio * 0.92, 0, Math.PI * 2);
+        ctx.arc(x, y, size * 0.92, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
         ctx.beginPath();
-        ctx.arc(x, y, size * game.ratio, 0, Math.PI * 2);
+        ctx.arc(x, y, size, 0, Math.PI * 2);
         ctx.stroke();
         ctx.shadowColor = "none";
         ctx.shadowBlur = 0;

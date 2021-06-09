@@ -373,7 +373,7 @@ export class LongHoldNote extends Note {
         s = Maths.lerp(0.5, 1, s);
         var color = page.scanLineDirection == -1 ? "#0af" : "#00bfa5";
 
-        var size = s * 80 * game.noteSize;
+        var size = s * 80 * game.noteSize * game.ratio;
 
         ctx.beginPath();
         if(typeof ctx.fillStyle == "string") {
@@ -382,16 +382,16 @@ export class LongHoldNote extends Note {
         ctx.shadowBlur = 60;
         ctx.strokeStyle = "#fff";
         ctx.lineWidth = size * 0.15;
-        ctx.arc(x, y, Maths.lerp(0.5, 1, Math.max(0, 1 - Math.abs(progress))) * size * game.ratio * 0.92, 0, Math.PI * 2);
+        ctx.arc(x, y, Maths.lerp(0.5, 1, Math.max(0, 1 - Math.abs(progress))) * size * 0.92, 0, Math.PI * 2);
         ctx.fillStyle = color;
         ctx.fill();
         ctx.shadowBlur = 0;
         ctx.beginPath();
-        ctx.arc(x, y, size * game.ratio, 0, Math.PI * 2);
+        ctx.arc(x, y, size, 0, Math.PI * 2);
         ctx.stroke();
         ctx.beginPath();
         ctx.fillStyle = "white";
-        ctx.arc(x, y, size * game.ratio * 0.3, 0, Math.PI * 2);
+        ctx.arc(x, y, size * 0.3, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
         ctx.shadowColor = "none";

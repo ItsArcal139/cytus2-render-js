@@ -356,29 +356,36 @@ export class HoldNote extends Note {
         
         var s = Math.max(0, 1 - Math.abs(progress * (progress >= 0 ? 5 : 0.5)));
         s = progress >= 0 ? Math.pow(s, 6) : Math.max(0, s * 2 - 1);
-        ctx.globalAlpha = s;
+        var a = ctx.globalAlpha = s;
         s = Maths.lerp(0.5, 1, s);
         var color = page.scanLineDirection == -1 ? "#0af" : "#00bfa5";
 
-        var size = s * 80 * game.noteSize;
+        var size = s * 80 * game.noteSize * game.ratio;
+
+        ctx.globalAlpha = a * 0.75;
+        ctx.fillStyle = "#000";
+        ctx.beginPath();
+        ctx.arc(x, y, size / 80 * 115 * Maths.clamp(0, 1, s * 2 - 1), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = a;
 
         ctx.beginPath();
+        ctx.shadowBlur = 60 * game.ratio;
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = size * 0.15;
+        ctx.arc(x, y, Maths.lerp(0.5, 1, Math.max(0, 1 - Math.abs(progress))) * size * 0.92, 0, Math.PI * 2);
+        ctx.fillStyle = color;
         if(typeof ctx.fillStyle == "string") {
             ctx.shadowColor = ctx.fillStyle;
         }
-        ctx.shadowBlur = 60;
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = size * 0.15;
-        ctx.arc(x, y, Maths.lerp(0.5, 1, Math.max(0, 1 - Math.abs(progress))) * size * game.ratio * 0.92, 0, Math.PI * 2);
-        ctx.fillStyle = color;
         ctx.fill();
         ctx.shadowBlur = 0;
         ctx.beginPath();
-        ctx.arc(x, y, size * game.ratio, 0, Math.PI * 2);
+        ctx.arc(x, y, size, 0, Math.PI * 2);
         ctx.stroke();
         ctx.beginPath();
         ctx.fillStyle = "white";
-        ctx.arc(x, y, size * game.ratio * 0.3, 0, Math.PI * 2);
+        ctx.arc(x, y, size * 0.3, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
         ctx.shadowColor = "none";

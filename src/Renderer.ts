@@ -1,3 +1,4 @@
+import { AnimatedObject } from "./AnimatedObject";
 import { Assets } from "./Assets";
 import { Beatmap } from "./beatmap/Beatmap";
 import { EventOrder } from "./beatmap/EventOrder";
@@ -26,16 +27,6 @@ interface RendererChartDiff {
     color: string,
     backColor: string,
     level: number,
-}
-
-export class AnimatedObject {
-    [key: string]: any;
-
-    constructor() {
-        this.data = {};
-        this.update = () => {};
-        this.isFinished = false;
-    }
 }
 
 export class Renderer {
@@ -85,6 +76,7 @@ export class Renderer {
             throw new Error("Your browser doesn't support Canvas 2D!");
         }
         this.context = ctx;
+        ctx.imageSmoothingEnabled = true;
 
         canvas.width = screen.height < screen.width ? screen.width : screen.height;
         canvas.height = screen.height < screen.width ? screen.height : screen.width;
@@ -95,6 +87,7 @@ export class Renderer {
             throw new Error("Your browser doesn't support Canvas 2D!");
         }
         this.comboFxCtx = comboFxCtx;
+        comboFxCtx.imageSmoothingEnabled = true;
 
         this.setupDefaultDebugLines();
 
@@ -216,6 +209,7 @@ export class Renderer {
         this.setupNoteAssets();
         this.setupOtherAssets();
 
+        this.fixedUpdate();
         this.update();
     }
 
@@ -225,6 +219,7 @@ export class Renderer {
         }
         Assets.loadAudioAsset("mm_audio", "./assets/mm/mm_sound.wav");
         Assets.loadAudioAsset("click_fx", "./assets/tapFX_3.wav");
+        Assets.loadAudioAsset("click_fx2", "./assets/soft-hitnormal.wav");
         Assets.loadImageAsset("muted", "./assets/mute-3-xxl.png");
         Assets.loadImageAsset("hold_strip", "./assets/hold-strip.png");
     }
@@ -240,9 +235,10 @@ export class Renderer {
             source.buffer = buffer;
             var gain = ctx.createGain();
             gain.gain.value = 1;
-            source.connect(gain).connect(ctx.destination);
+            source.connect(gain).connect(this.audioCompressor);
             source.addEventListener("ended", e => {
                 source.disconnect();
+                gain.disconnect();
             });
             source.start(0);
         }
@@ -255,6 +251,7 @@ export class Renderer {
     public activeAudioBuffer!: AudioBuffer;
     public isPlaying!: boolean;
     public gainNode!: GainNode;
+    public audioCompressor!: DynamicsCompressorNode;
 
     public setupAudio() {
         this.audioElem = (() => {
@@ -325,7 +322,12 @@ export class Renderer {
         var gain = this.gainNode = ctx.createGain();
         gain.gain.value = this.audioCompatMode ? 0 : 1;
 
+        var compressor = this.audioCompressor = ctx.createDynamicsCompressor();
+        compressor.threshold.value = -30;
+        compressor.ratio.value = 20;
+
         this.audioAnalyser.connect(gain).connect(this.audioContext.destination);
+        compressor.connect(this.audioContext.destination);
     }
 
     public setPlaybackRate(rate: number) {
@@ -1290,7 +1292,7 @@ export class Renderer {
         });
 
         var sn = parseInt(score);
-        if(this.lastScore < sn && sn == 1000000 && this.isPlaying && !this.enableMMEffect) {
+        if(this.lastScore < sn && sn == 1000000 && this.isPlaying && this.enableMMEffect) {
             this.playMMEffect();
         }
 
@@ -1560,5 +1562,15 @@ export class Renderer {
             if(time > duration) obj.isFinished = true;
         };
         this.animatedObjects.push(obj);
+    }
+
+    public fixedUpdate() {
+        window.setTimeout(() => {
+            this.fixedUpdate();
+        }, 5);
+
+        this.animatedObjects.forEach(obj => {
+            obj.fixedUpdate(this);
+        });
     }
 }

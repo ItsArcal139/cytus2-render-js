@@ -74,7 +74,7 @@ export class FlickNote extends Note {
         s = Maths.lerp(0.5, 1, s);
         ctx.fillStyle = page.scanLineDirection == -1 ? "#0af" : "#00bfa5";
 
-        var size = s * 80 * game.noteSize;
+        var size = s * 80 * game.noteSize * game.ratio;
 
         ctx.lineWidth = size * 0.15;
         ctx.strokeStyle = "#fff";
@@ -86,7 +86,7 @@ export class FlickNote extends Note {
 
         var fillSize = Maths.lerp(0.5, 1, Math.max(0, 1 - Math.abs(progress))) * s;
         ctx.shadowColor = ctx.fillStyle;
-        ctx.shadowBlur = 60;
+        ctx.shadowBlur = 60 * game.ratio;
         ctx.fillRect(-size / 2 * fillSize, -size / 2 * fillSize, size * fillSize, size * fillSize);
         ctx.shadowBlur = 0;
 
