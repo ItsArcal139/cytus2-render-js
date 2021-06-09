@@ -298,7 +298,7 @@ export class SliderNote extends Note implements Slidable {
             ctx.fillStyle = page.scanLineDirection == -1 ? "#6969ff" : "#4360f0";
         }
 
-        var size = s * 80 * game.noteSize;
+        var size = s * 80 * game.noteSize * game.ratio;
 
         var duringDrag = tick >= this.tick && tick < this.getEndTick();
 
@@ -316,6 +316,7 @@ export class SliderNote extends Note implements Slidable {
 
         for(var i = points.length - 1; i >= 0; i--) {
             var n = points[i].note;
+            n.update(game);
             n.renderVector(game);
         }
         
@@ -345,18 +346,18 @@ export class SliderNote extends Note implements Slidable {
             size *= 0.6;
             ctx.beginPath();
             ctx.shadowColor = ctx.fillStyle;
-            ctx.shadowBlur = 60;
+            ctx.shadowBlur = 60 * game.ratio;
             ctx.strokeStyle = "#fff";
             ctx.lineWidth = size * 0.15;
-            ctx.arc(0, 0, Maths.lerp(0.5, 1, Math.max(0, 1 - Math.abs(progress))) * size * game.ratio * 0.92, 0, Math.PI * 2);
+            ctx.arc(0, 0, Maths.lerp(0.5, 1, Math.max(0, 1 - Math.abs(progress))) * size * 0.92, 0, Math.PI * 2);
             ctx.fill();
             ctx.shadowBlur = 0;
             ctx.beginPath();
-            ctx.arc(0, 0, size * game.ratio, 0, Math.PI * 2);
+            ctx.arc(0, 0, size, 0, Math.PI * 2);
             ctx.stroke();
             ctx.beginPath();
             ctx.fillStyle = "white";
-            ctx.arc(0, 0, size * game.ratio * 0.3, 0, Math.PI * 2);
+            ctx.arc(0, 0, size * 0.3, 0, Math.PI * 2);
             ctx.fill();
             ctx.beginPath();
             ctx.shadowColor = "none";
